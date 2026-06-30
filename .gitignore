@@ -1,0 +1,125 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+.python-version
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# IDEs
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# macOS
+# =========================
+.DS_Store
+
+# =========================
+# Node / React
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build Outputs
+frontend/dist/
+frontend/build/
+.next/
+out/
+
+# =========================
+# ChromaDB
+# =========================
+chroma/
+chroma_db/
+persist/
+vectorstore/
+
+# =========================
+# Embeddings / Models
+# =========================
+models/
+cache/
+.huggingface/
+transformers_cache/
+
+# =========================
+# Generated Data
+# =========================
+data/processed/
+data/chunks/
+data/indexes/
+
+# Keep raw documents if desired
+# !data/raw/
+
+# =========================
+# SQLite
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Docker
+# =========================
+.docker/
+
+# =========================
+# Coverage
+# =========================
+coverage.xml
+
+# =========================
+# Secrets
+# =========================
+secrets/
+credentials.json
+service-account.json
+
+# =========================
+# OS Files
+# =========================
+Thumbs.db

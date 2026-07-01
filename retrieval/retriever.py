@@ -29,6 +29,7 @@ class Retriever:
         ):
             chunks.append(
                 {
+                    "id": results["metadatas"][0][i]["chunk_id"],
                     "content": doc,
                     "metadata":
                         results["metadatas"][0][i],

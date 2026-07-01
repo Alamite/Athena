@@ -1,6 +1,10 @@
 from retrieval.retriever import Retriever
 from retrieval.filters import filter_chunks
 from retrieval.context_builder import build_context
+from retrieval.hybrid_retriever import (
+    HybridRetriever
+)
+
 
 from generation.answer_generator import (
     AnswerGenerator
@@ -17,15 +21,15 @@ def main():
         "Question: "
     )
 
-    retriever = Retriever()
+    retriever = HybridRetriever()
 
     chunks = retriever.retrieve(
         question
     )
 
-    chunks = filter_chunks(
-        chunks
-    )
+    # chunks = filter_chunks(
+    #     chunks
+    # )
 
     if not chunks:
 

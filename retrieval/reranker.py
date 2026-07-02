@@ -35,6 +35,6 @@ class Reranker:
         )
 
         return [
-            item[0]
+            {**item[0], "rerank_score": float(item[1])}
             for item in ranked
         ]

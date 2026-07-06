@@ -1,4 +1,5 @@
 import logging
+import re
 
 from openai import OpenAI
 
@@ -50,13 +51,19 @@ numbering or extra commentary.
                 ],
             )
 
-            queries = response.choices[0].message.content.splitlines()
+            lines = response.choices[0].message.content.splitlines()
 
-            queries = [
-                q.strip("-* \t")
-                for q in queries
-                if q.strip("-* \t")
-            ]
+            queries = []
+            for line in lines:
+                # strip bullet/numbering prefixes (e.g. "1. ", "- ") without
+                # touching trailing characters, which may be meaningful
+                # (e.g. "iPhone 15")
+                cleaned = re.sub(r"^[\s\-*]*\d*[.)]?\s*", "", line).strip()
+                if not cleaned or cleaned.endswith(":"):
+                    # drops preamble lines models sometimes add, e.g.
+                    # "Here are 4 alternative search queries:"
+                    continue
+                queries.append(cleaned)
 
             print(
                 queries[:n]

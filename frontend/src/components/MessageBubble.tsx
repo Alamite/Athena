@@ -1,13 +1,15 @@
-import type { Citation } from '../services/api'
+import type { Citation, PipelineEvent } from '../services/api'
 import CitationList from './CitationList'
+import PipelineTrace from './PipelineTrace'
 
 interface Props {
   role: 'user' | 'assistant'
   content: string
   citations?: Citation[]
+  trace?: PipelineEvent[]
 }
 
-export default function MessageBubble({ role, content, citations }: Props) {
+export default function MessageBubble({ role, content, citations, trace }: Props) {
   const isUser = role === 'user'
 
   return (
@@ -24,7 +26,8 @@ export default function MessageBubble({ role, content, citations }: Props) {
             Assistant
           </p>
         )}
-        <p className="whitespace-pre-wrap">{content}</p>
+        {!isUser && trace && trace.length > 0 && <PipelineTrace events={trace} />}
+        {content && <p className="whitespace-pre-wrap">{content}</p>}
         {!isUser && citations && <CitationList citations={citations} />}
       </div>
     </div>

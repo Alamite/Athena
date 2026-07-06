@@ -36,19 +36,50 @@ class RAGService:
         self._retriever = None
         logger.info("RAGService: retriever will reload on next request")
 
-    def answer_question(self, question: str) -> dict:
-        chunks = self.retriever.retrieve(question)
+    def answer_question(self, question: str, on_event=None) -> dict:
+        def emit(step, status, message, **data):
+            if on_event:
+                event = {"step": step, "status": status, "message": message}
+                if data:
+                    event["data"] = data
+                on_event(event)
+
+        chunks = self.retriever.retrieve(question, on_event=on_event)
 
         if not chunks:
+            emit(
+                "generation", "done",
+                "No relevant chunks found; skipping generation"
+            )
             return {
                 "answer": "I cannot answer based on the retrieved documents.",
                 "citations": [],
                 "retrieved_chunks": [],
             }
 
+        emit(
+            "build_context", "start",
+            "Assembling context window from retrieved chunks..."
+        )
         context = build_context(chunks)
+        emit(
+            "build_context", "done",
+            f"Context assembled ({len(context)} characters)"
+        )
+
+        emit(
+            "generation", "start",
+            f"Generating answer with {self.generator.model} via Ollama..."
+        )
         answer = self.generator.generate(question, context)
+        emit("generation", "done", "Answer generated")
+
+        emit("citations", "start", "Extracting source citations...")
         citations = generate_citations(chunks)
+        emit(
+            "citations", "done",
+            f"Found {len(citations)} citation(s)"
+        )
 
         retrieved_chunks = [
             {

@@ -1,17 +1,20 @@
 import { useEffect, useRef } from 'react'
-import type { Citation } from '../services/api'
+import type { Citation, PipelineEvent } from '../services/api'
 import MessageBubble from './MessageBubble'
+import PipelineTrace from './PipelineTrace'
 
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   citations?: Citation[]
+  trace?: PipelineEvent[]
 }
 
 interface Props {
   messages: Message[]
   isLoading: boolean
+  liveTrace: PipelineEvent[]
   input: string
   onInputChange: (value: string) => void
   onSubmit: () => void
@@ -20,6 +23,7 @@ interface Props {
 export default function ChatWindow({
   messages,
   isLoading,
+  liveTrace,
   input,
   onInputChange,
   onSubmit,
@@ -60,18 +64,23 @@ export default function ChatWindow({
               role={msg.role}
               content={msg.content}
               citations={msg.citations}
+              trace={msg.trace}
             />
           ))
         )}
 
         {isLoading && (
           <div className="flex justify-start">
-            <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-3">
-              <div className="flex gap-1 items-center h-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:0ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:150ms]" />
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:300ms]" />
-              </div>
+            <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]">
+              {liveTrace.length > 0 ? (
+                <PipelineTrace events={liveTrace} />
+              ) : (
+                <div className="flex gap-1 items-center h-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:0ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:150ms]" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:300ms]" />
+                </div>
+              )}
             </div>
           </div>
         )}

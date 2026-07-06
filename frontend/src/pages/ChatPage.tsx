@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import ChatWindow, { type Message } from '../components/ChatWindow'
 import FileUploader from '../components/FileUploader'
 import RetrievalPanel from '../components/RetrievalPanel'
-import { askQuestion, listDocuments, type DocumentInfo, type RetrievedChunk } from '../services/api'
+import {
+  askQuestionStream,
+  listDocuments,
+  type DocumentInfo,
+  type PipelineEvent,
+  type RetrievedChunk,
+} from '../services/api'
 
 let messageIdCounter = 0
 const nextId = () => String(++messageIdCounter)
@@ -14,6 +20,7 @@ export default function ChatPage() {
   const [documents, setDocuments] = useState<DocumentInfo[]>([])
   const [retrievedChunks, setRetrievedChunks] = useState<RetrievedChunk[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [liveTrace, setLiveTrace] = useState<PipelineEvent[]>([])
 
   const fetchDocuments = useCallback(async () => {
     try {
@@ -35,14 +42,20 @@ export default function ChatPage() {
     setInput('')
     setError(null)
     setIsLoading(true)
+    setLiveTrace([])
 
     setMessages((prev) => [
       ...prev,
       { id: nextId(), role: 'user', content: question },
     ])
 
+    const trace: PipelineEvent[] = []
+
     try {
-      const result = await askQuestion(question)
+      const result = await askQuestionStream(question, (event) => {
+        trace.push(event)
+        setLiveTrace([...trace])
+      })
 
       setMessages((prev) => [
         ...prev,
@@ -51,6 +64,7 @@ export default function ChatPage() {
           role: 'assistant',
           content: result.answer,
           citations: result.citations,
+          trace,
         },
       ])
 
@@ -65,10 +79,12 @@ export default function ChatPage() {
           id: nextId(),
           role: 'assistant',
           content: 'Sorry, something went wrong. Please try again.',
+          trace,
         },
       ])
     } finally {
       setIsLoading(false)
+      setLiveTrace([])
     }
   }, [input, isLoading])
 
@@ -125,6 +141,7 @@ export default function ChatPage() {
           <ChatWindow
             messages={messages}
             isLoading={isLoading}
+            liveTrace={liveTrace}
             input={input}
             onInputChange={setInput}
             onSubmit={handleSubmit}

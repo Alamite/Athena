@@ -2,6 +2,7 @@ from retrieval.retriever import Retriever
 from retrieval.bm25_retriever import BM25Retriever
 from retrieval.fusion import reciprocal_rank_fusion
 from retrieval.reranker import Reranker
+from retrieval.query_expander import QueryRewriter
 
 
 class HybridRetriever:
@@ -10,6 +11,7 @@ class HybridRetriever:
         self.vector = Retriever()
         self.bm25 = BM25Retriever()
         self.reranker = Reranker()
+        self.query_rewriter = QueryRewriter()
 
     def retrieve(
         self,
@@ -18,20 +20,19 @@ class HybridRetriever:
         final_k=5
     ):
 
-        vector_results = self.vector.retrieve(
-            query,
-            top_k=retrieval_k
-        )
+        queries = [query] + self.query_rewriter.rewrite(query)
 
-        bm25_results = self.bm25.search(
-            query,
-            top_k=retrieval_k
-        )
+        result_lists = []
 
-        fused_results = reciprocal_rank_fusion(
-            vector_results,
-            bm25_results
-        )
+        for q in queries:
+            result_lists.append(
+                self.vector.retrieve(q, top_k=retrieval_k)
+            )
+            result_lists.append(
+                self.bm25.search(q, top_k=retrieval_k)
+            )
+
+        fused_results = reciprocal_rank_fusion(*result_lists)
 
         reranked_results = self.reranker.rerank(
             query,

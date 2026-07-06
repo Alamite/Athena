@@ -3,8 +3,8 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 def chunk_text(
     text: str,
-    chunk_size: int = 200,
-    chunk_overlap: int = 100,
+    chunk_size: int = 800,
+    chunk_overlap: int = 200,
 ):
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,

@@ -23,7 +23,7 @@ export default function MessageBubble({ role, content, citations, trace }: Props
       >
         {!isUser && (
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">
-            Assistant
+            Athena
           </p>
         )}
         {!isUser && trace && trace.length > 0 && <PipelineTrace events={trace} />}

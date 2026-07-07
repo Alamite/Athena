@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Citation, PipelineEvent } from '../services/api'
 import MessageBubble from './MessageBubble'
+import OwlLoader from './OwlLoader'
 import PipelineTrace from './PipelineTrace'
 
 export interface Message {
@@ -73,13 +74,14 @@ export default function ChatWindow({
           <div className="flex justify-start">
             <div className="bg-gray-800 rounded-2xl rounded-bl-sm px-4 py-3 max-w-[80%]">
               {liveTrace.length > 0 ? (
-                <PipelineTrace events={liveTrace} />
+                <>
+                  <OwlLoader />
+                  <div className="mt-2">
+                    <PipelineTrace events={liveTrace} />
+                  </div>
+                </>
               ) : (
-                <div className="flex gap-1 items-center h-4">
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:0ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:150ms]" />
-                  <span className="w-1.5 h-1.5 rounded-full bg-gray-500 animate-bounce [animation-delay:300ms]" />
-                </div>
+                <OwlLoader />
               )}
             </div>
           </div>

@@ -8,14 +8,8 @@ class Retriever:
         self.embedder = Embedder()
         self.store = ChromaStore()
 
-    def retrieve(
-        self,
-        query,
-        top_k=5
-    ):
-        query_embedding = self.embedder.embed(
-            [query]
-        )[0]
+    def retrieve(self, query, top_k=5):
+        query_embedding = self.embedder.embed([query])[0]
 
         results = self.store.search(
             query_embedding=query_embedding,
@@ -24,17 +18,22 @@ class Retriever:
 
         chunks = []
 
-        for i, doc in enumerate(
-            results["documents"][0]
-        ):
+        documents = results.get("documents", [[]])[0]
+        metadatas = results.get("metadatas", [[]])[0]
+        distances = results.get("distances", [[]])[0]
+
+        for i, doc in enumerate(documents):
+            metadata = metadatas[i] if i < len(metadatas) else {}
+
+            if metadata is None:
+                metadata = {}
+
             chunks.append(
                 {
-                    "id": results["metadatas"][0][i]["chunk_id"],
+                    "id": metadata.get("chunk_id", f"unknown-{i}"),
                     "content": doc,
-                    "metadata":
-                        results["metadatas"][0][i],
-                    "distance":
-                        results["distances"][0][i]
+                    "metadata": metadata,
+                    "distance": distances[i] if i < len(distances) else None,
                 }
             )
 

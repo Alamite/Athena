@@ -4,7 +4,7 @@ from app.core.config import settings
 from app.services.embedding_service import get_embedding_model
 
 vector_store = Chroma(
-    collection_name = "rag_socuments",
+    collection_name = settings.COLLECTINO_NAME,
     embedding_function = get_embedding_model(),
     persist_directory = settings.VECTOR_DB_PATH
 )

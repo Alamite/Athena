@@ -1,9 +1,9 @@
 from langchain_ollama import ChatOllama
-from dotenv import load_dotenv
-import os
 
-MODEL = os.getenv("MODEL")
-TEMP = os.getenv("TEMP")
+from app.core.config import settings
+
+model = settings.MODEL
+temp = settings.TEMP
 
 llm = ChatOllama (
     model = "llama3.1:8b",
@@ -13,3 +13,6 @@ llm = ChatOllama (
 async def generate_response(message: str) -> str:
     response = await llm.ainvoke(message)
     return response.content
+
+def get_llm():
+    return llm

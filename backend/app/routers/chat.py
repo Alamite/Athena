@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.schemas.chat_schema import ChatRequest, ChatResponse
 from app.services.llm_service import generate_response
+from app.services.rag_service import generate_rag_response
 
 router = APIRouter(
     prefix = "/chat",
@@ -11,8 +12,9 @@ router = APIRouter(
 @router.post("/", response_model = ChatResponse)
 async def chat(request: ChatRequest):
 
-    response = await generate_response(request.message)
+    result = await generate_rag_response(request.message)
 
     return ChatResponse(
-        response = response
+        response=result["response"],
+        sources=result["sources"]
     )

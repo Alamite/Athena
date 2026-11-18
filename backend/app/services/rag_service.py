@@ -20,8 +20,8 @@ prompt = ChatPromptTemplate.from_template(
     """
 )
 
-async def generate_rag_response(question: str):
-    documents = retrieve_documents(question)
+async def generate_rag_response(question: str, retrieval_type: str = "similarity"):
+    documents = retrieve_documents(question, 3, retrieval_type)
 
     context = "\n\n".join(
         doc.page_content for doc in documents
@@ -37,7 +37,9 @@ async def generate_rag_response(question: str):
     sources = [
         {
             "sources" : doc.metadata.get("source"),
-            "page" : doc.metadata.get("page")
+            "page" : doc.metadata.get("page") + 1
+                if doc.metadata.get("page") is not None
+                else None
         }
         for doc in documents
     ]

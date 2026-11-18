@@ -17,7 +17,7 @@ router = APIRouter(
     tags=["documents"]
 )
 
-@router.post("upload",response_model = DocumentUploadResponse)
+@router.post("/upload",response_model = DocumentUploadResponse)
 async def upload_document(file: UploadFile = File(...)):
 
     if not file.filename:
@@ -29,7 +29,7 @@ async def upload_document(file: UploadFile = File(...)):
     if Path(file.filename).suffix.lower() != ".pdf":
         raise HTTPException(
             status_code = 400,
-            detial = "Only PDF files allowed."
+            detail = "Only PDF files allowed."
         )
 
 

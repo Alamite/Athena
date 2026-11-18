@@ -9,6 +9,7 @@ class ChatRequest(BaseModel):
         "bm25",
         "hybrid_search"
     ] = "similarity"
+    k: int = 3
 
 class Source(BaseModel):
     source: str | None = None

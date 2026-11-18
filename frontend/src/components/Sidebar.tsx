@@ -1,0 +1,260 @@
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { uploadDocument, type RetrievalType, type UploadResponse } from '../api'
+
+const RETRIEVAL_OPTIONS: { value: RetrievalType; label: string; hint: string }[] = [
+  { value: 'similarity', label: 'Vector', hint: 'Semantic similarity via embeddings' },
+  { value: 'bm25', label: 'BM25', hint: 'Keyword matching' },
+  { value: 'hybrid_search', label: 'Hybrid', hint: 'Vector + BM25 fused with RRF' },
+]
+
+type Tab = 'ingestion' | 'retrieval' | 'evaluation'
+
+const svg = (d: ReactNode) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {d}
+  </svg>
+)
+
+const ICONS: Record<Tab | 'collapse' | 'expand', ReactNode> = {
+  ingestion: svg(<><path d="M12 16V4" /><path d="m7 9 5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></>),
+  retrieval: svg(<><circle cx="11" cy="11" r="6.5" /><path d="m20 20-4.2-4.2" /></>),
+  evaluation: svg(<><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></>),
+  collapse: svg(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /><path d="m15 10-2 2 2 2" /></>),
+  expand: svg(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /><path d="m13 10 2 2-2 2" /></>),
+}
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'ingestion', label: 'Ingestion' },
+  { id: 'retrieval', label: 'Retrieval' },
+  { id: 'evaluation', label: 'Evaluation' },
+]
+
+function loadPref<T extends string>(key: string, fallback: T, allowed: readonly T[]): T {
+  try {
+    const v = localStorage.getItem(key) as T | null
+    return v && allowed.includes(v) ? v : fallback
+  } catch {
+    return fallback
+  }
+}
+function savePref(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+interface Props {
+  retrievalType: RetrievalType
+  onRetrievalTypeChange: (t: RetrievalType) => void
+  k: number
+  onKChange: (k: number) => void
+  documents: UploadResponse[]
+  onUploaded: (doc: UploadResponse) => void
+  /** Mobile drawer visibility. */
+  open: boolean
+  onClose: () => void
+}
+
+export function Sidebar(props: Props) {
+  const { open, onClose } = props
+  const [collapsed, setCollapsed] = useState(() => loadPref('athena.sidebar', 'open', ['open', 'collapsed'] as const) === 'collapsed')
+  const [tab, setTab] = useState<Tab>(() => loadPref('athena.tab', 'ingestion', ['ingestion', 'retrieval', 'evaluation'] as const))
+
+  useEffect(() => savePref('athena.sidebar', collapsed ? 'collapsed' : 'open'), [collapsed])
+  useEffect(() => savePref('athena.tab', tab), [tab])
+
+  return (
+    <>
+      <div className={`scrim ${open ? 'show' : ''}`} onClick={onClose} />
+      <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
+        {/* Collapsed rail (desktop only) */}
+        <div className="rail">
+          <button className="rail-btn" onClick={() => setCollapsed(false)} title="Expand panel" aria-label="Expand panel">
+            {ICONS.expand}
+          </button>
+          <div className="rail-sep" />
+          {TABS.map((t) => (
+            <button
+              key={t.id}
+              className={`rail-btn ${tab === t.id ? 'active' : ''}`}
+              title={t.label}
+              aria-label={t.label}
+              onClick={() => {
+                setTab(t.id)
+                setCollapsed(false)
+              }}
+            >
+              {ICONS[t.id]}
+            </button>
+          ))}
+        </div>
+
+        {/* Expanded panel */}
+        <div className="panel">
+          <div className="panel-head">
+            <div className="brand">
+              <span className="brand-mark">A</span>
+              <span>Athena</span>
+            </div>
+            <button className="rail-btn collapse-btn" onClick={() => setCollapsed(true)} title="Collapse panel" aria-label="Collapse panel">
+              {ICONS.collapse}
+            </button>
+          </div>
+
+          <div className="tabs" role="tablist">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                className={tab === t.id ? 'active' : ''}
+                onClick={() => setTab(t.id)}
+              >
+                {ICONS[t.id]}
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="tab-body" role="tabpanel">
+            {tab === 'ingestion' && <IngestionTab {...props} />}
+            {tab === 'retrieval' && <RetrievalTab {...props} />}
+            {tab === 'evaluation' && <EvaluationTab />}
+          </div>
+        </div>
+      </aside>
+    </>
+  )
+}
+
+function IngestionTab({ documents, onUploaded }: Props) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+
+  async function handleFiles(files: FileList | null) {
+    if (!files?.length) return
+    setError(null)
+    for (const file of Array.from(files)) {
+      if (!file.name.toLowerCase().endsWith('.pdf')) {
+        setError(`${file.name}: only PDF files are supported.`)
+        continue
+      }
+      setUploading(file.name)
+      try {
+        onUploaded(await uploadDocument(file))
+      } catch (e) {
+        setError(`${file.name}: ${(e as Error).message}`)
+      }
+    }
+    setUploading(null)
+    if (inputRef.current) inputRef.current.value = ''
+  }
+
+  return (
+    <section>
+      <h2>Upload documents</h2>
+      <div
+        className={`dropzone ${dragOver ? 'over' : ''} ${uploading ? 'busy' : ''}`}
+        onClick={() => !uploading && inputRef.current?.click()}
+        onDragOver={(e) => {
+          e.preventDefault()
+          setDragOver(true)
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setDragOver(false)
+          if (!uploading) handleFiles(e.dataTransfer.files)
+        }}
+      >
+        {uploading ? (
+          <>
+            <span className="spinner" />
+            <span>Indexing {uploading}…</span>
+          </>
+        ) : (
+          <>
+            <span className="dropzone-icon">{ICONS.ingestion}</span>
+            <strong>Drop PDFs here</strong>
+            <span>or click to browse</span>
+          </>
+        )}
+        <input ref={inputRef} type="file" accept="application/pdf,.pdf" multiple hidden onChange={(e) => handleFiles(e.target.files)} />
+      </div>
+      {error && <p className="error-text">{error}</p>}
+
+      {documents.length > 0 && (
+        <>
+          <h2 className="spaced">Indexed this session</h2>
+          <ul className="doc-list">
+            {documents.map((d) => (
+              <li key={d.document_id}>
+                <span className="doc-icon">PDF</span>
+                <div>
+                  <div className="doc-name" title={d.filename}>
+                    {d.filename}
+                  </div>
+                  <div className="doc-meta">
+                    {d.total_pages} pages · {d.total_chunks} chunks
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <p className="hint">Previously indexed documents remain searchable.</p>
+    </section>
+  )
+}
+
+function RetrievalTab({ retrievalType, onRetrievalTypeChange, k, onKChange }: Props) {
+  return (
+    <section>
+      <h2>Strategy</h2>
+      <div className="option-list" role="radiogroup" aria-label="Retrieval type">
+        {RETRIEVAL_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            role="radio"
+            aria-checked={retrievalType === o.value}
+            className={`option ${retrievalType === o.value ? 'active' : ''}`}
+            onClick={() => onRetrievalTypeChange(o.value)}
+          >
+            <span className="radio" />
+            <span>
+              <strong>{o.label}</strong>
+              <small>{o.hint}</small>
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <h2 className="spaced">Top-k</h2>
+      <label className="slider">
+        <span>
+          Chunks to retrieve <strong>{k}</strong>
+        </span>
+        <input type="range" min={1} max={10} value={k} onChange={(e) => onKChange(Number(e.target.value))} />
+      </label>
+    </section>
+  )
+}
+
+function EvaluationTab() {
+  return (
+    <section className="coming-soon">
+      <span className="coming-icon">{ICONS.evaluation}</span>
+      <strong>Evaluation</strong>
+      <span className="pill">Coming soon</span>
+      <p className="hint">
+        Compare retrieval strategies with Precision@k, Recall@k and MRR against a labelled query set.
+      </p>
+    </section>
+  )
+}

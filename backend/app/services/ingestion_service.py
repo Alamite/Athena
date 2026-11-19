@@ -1,116 +1,60 @@
-import json
-import logging
 from pathlib import Path
-from typing import List, Optional
+import hashlib
 
-from backend.app.config import (
-    DATA_RAW_DIR,
-    DATA_PROCESSED_DIR,
-    CHUNKS_FILE,
-    CHROMA_DIR,
-)
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_community.document_loaders import PyPDFLoader
 
-# Import after config ensures sys.path is set
-from ingestion.pipeline import process_documents
-from embeddings.embedder import Embedder
-from vectorstore.chroma_store import ChromaStore
+from app.database.vector_store import get_vector_store
 
-logger = logging.getLogger(__name__)
+def ingest_document(file_path: str, original_filename: str):
 
+    with open(file_path, "rb") as file:
+        file_hash = hashlib.sha256(file.read()).hexdigest()
 
-class IngestionService:
+    document_id = file_hash
 
-    def __init__(self):
-        self.embedder = Embedder()
-        self.store = ChromaStore(persist_directory=str(CHROMA_DIR))
+    loader = PyPDFLoader(file_path)
+    documents = loader.load()
 
-    def ingest_file(self, filename: str, content: bytes) -> int:
-        """Save an uploaded .md file, chunk it, embed it, and update ChromaDB.
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size = 1000,
+        chunk_overlap = 150
+    )
 
-        Returns the number of new chunks created.
-        """
-        DATA_RAW_DIR.mkdir(parents=True, exist_ok=True)
-        DATA_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    chunks = splitter.split_documents(documents)
 
-        file_path = DATA_RAW_DIR / filename
-        file_path.write_bytes(content)
+    # Add metadata to chunks
+    for index, chunk in enumerate(chunks):
+        chunk.metadata.update({
+            "document_id": document_id,
+            "filename": original_filename,
+            "chunk_index": index 
+        })
 
-        document_name = Path(filename).stem
+    # Create unique chunk ids
+    chunk_ids = [
+        f"{document_id}_{index}"
+        for index in range(len(chunks))
+    ]
 
-        doc = {
-            "document_name": document_name,
-            "source": str(file_path),
-            "content": file_path.read_text(encoding="utf-8"),
+    vector_store = get_vector_store()
+
+    # Remove previous chunks if the same document was already indexed.
+    vector_store.delete(
+        where = {
+            "document_id": document_id
         }
+    )
 
-        new_chunks = process_documents([doc])
-        new_chunks_dicts = [c.to_dict() for c in new_chunks]
+    # Add the chunks to vector DB
+    vector_store.add_documents(
+        documents = chunks,
+        ids = chunk_ids
+    )
 
-        # Reload existing chunks and replace this document's entries
-        existing_chunks: List[dict] = []
-        if CHUNKS_FILE.exists():
-            with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
-                existing_chunks = json.load(f)
-
-        existing_chunks = [
-            c for c in existing_chunks if c["document_name"] != document_name
-        ]
-        all_chunks = existing_chunks + new_chunks_dicts
-
-        with open(CHUNKS_FILE, "w", encoding="utf-8") as f:
-            json.dump(all_chunks, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"Saved {len(all_chunks)} total chunks to {CHUNKS_FILE}")
-
-        # Remove stale ChromaDB entries for this document
-        try:
-            self.store.collection.delete(where={"document_name": document_name})
-        except Exception:
-            pass  # Collection may be empty; delete is best-effort
-
-        # Embed and index new chunks
-        texts = [c["content"] for c in new_chunks_dicts]
-        logger.info(f"Embedding {len(texts)} chunks for '{document_name}'...")
-        embeddings = self.embedder.embed(texts)
-
-        self.store.add_documents(
-            ids=[c["id"] for c in new_chunks_dicts],
-            documents=texts,
-            embeddings=embeddings,
-            metadatas=[
-                {
-                    "document_name": c["document_name"],
-                    "source": c["source"],
-                    "chunk_index": c["chunk_index"],
-                    "chunk_id": c["id"],
-                }
-                for c in new_chunks_dicts
-            ],
-        )
-
-        logger.info(f"Indexed {len(new_chunks)} chunks for '{document_name}'")
-        return len(new_chunks)
-
-    def list_documents(self) -> List[dict]:
-        if not CHUNKS_FILE.exists():
-            return []
-
-        with open(CHUNKS_FILE, "r", encoding="utf-8") as f:
-            chunks = json.load(f)
-
-        counts: dict = {}
-        for chunk in chunks:
-            name = chunk["document_name"]
-            counts[name] = counts.get(name, 0) + 1
-
-        return [{"name": name, "chunks": count} for name, count in counts.items()]
-
-
-_ingestion_service: Optional[IngestionService] = None
-
-
-def get_ingestion_service() -> IngestionService:
-    global _ingestion_service
-    if _ingestion_service is None:
-        _ingestion_service = IngestionService()
-    return _ingestion_service
+    return {
+        "document_id": document_id,
+        "filename": original_filename,
+        "total_pages": len(documents),
+        "total_chunks": len(chunks)
+    }

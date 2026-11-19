@@ -1,108 +1,50 @@
-import logging
-from typing import Optional
+from langchain_core.prompts import ChatPromptTemplate
 
-from backend.app.config import ROOT_DIR
+from app.services.llm_service import get_llm
+from app.services.retrieval_service import retrieve_documents
 
-logger = logging.getLogger(__name__)
+prompt = ChatPromptTemplate.from_template(
+    """
+    Answer the question using ONLY the provided context.
 
-# Import after config ensures sys.path is set
-from retrieval.hybrid_retriever import HybridRetriever
-from retrieval.context_builder import build_context
-from generation.answer_generator import AnswerGenerator
-from generation.citations import generate_citations
+    If the answer is not available in the context,
+    say that you don't have enough information.
 
+    Context:
+    {context}
 
-class RAGService:
+    Question:
+    {question}
 
-    def __init__(self):
-        self._retriever: Optional[HybridRetriever] = None
-        self._generator: Optional[AnswerGenerator] = None
+    Answer:
+    """
+)
 
-    @property
-    def retriever(self) -> HybridRetriever:
-        if self._retriever is None:
-            logger.info("Initializing HybridRetriever (this may take a moment)...")
-            self._retriever = HybridRetriever()
-        return self._retriever
+async def generate_rag_response(question: str, retrieval_type: str = "similarity", k: int = 3, use_reranker: bool = False):
+    documents = retrieve_documents(question, k, retrieval_type, use_reranker)
 
-    @property
-    def generator(self) -> AnswerGenerator:
-        if self._generator is None:
-            self._generator = AnswerGenerator()
-        return self._generator
+    context = "\n\n".join(
+        doc.page_content for doc in documents
+    )
 
-    def reload(self):
-        """Drop the cached retriever so it rebuilds with the latest chunks on next use."""
-        self._retriever = None
-        logger.info("RAGService: retriever will reload on next request")
+    chain = prompt | get_llm()
 
-    def answer_question(self, question: str, on_event=None) -> dict:
-        def emit(step, status, message, **data):
-            if on_event:
-                event = {"step": step, "status": status, "message": message}
-                if data:
-                    event["data"] = data
-                on_event(event)
+    response = await chain.ainvoke({
+        "context": context,
+        "question" : question
+    })
 
-        chunks = self.retriever.retrieve(question, on_event=on_event)
-
-        if not chunks:
-            emit(
-                "generation", "done",
-                "No relevant chunks found; skipping generation"
-            )
-            return {
-                "answer": "I cannot answer based on the retrieved documents.",
-                "citations": [],
-                "retrieved_chunks": [],
-            }
-
-        emit(
-            "build_context", "start",
-            "Assembling context window from retrieved chunks..."
-        )
-        context = build_context(chunks)
-        emit(
-            "build_context", "done",
-            f"Context assembled ({len(context)} characters)"
-        )
-
-        emit(
-            "generation", "start",
-            f"Generating answer with {self.generator.model} via Ollama..."
-        )
-        answer = self.generator.generate(question, context)
-        emit("generation", "done", "Answer generated")
-
-        emit("citations", "start", "Extracting source citations...")
-        citations = generate_citations(chunks)
-        emit(
-            "citations", "done",
-            f"Found {len(citations)} citation(s)"
-        )
-
-        retrieved_chunks = [
-            {
-                "document": c["metadata"]["document_name"],
-                "chunk": c["metadata"]["chunk_index"],
-                "score": round(float(c.get("rerank_score", 0.0)), 4),
-                "content": c["content"],
-            }
-            for c in chunks
-        ]
-
-        return {
-            "answer": answer,
-            "citations": citations,
-            "retrieved_chunks": retrieved_chunks,
+    sources = [
+        {
+            "source" : doc.metadata.get("filename") or doc.metadata.get("source"),
+            "page" : doc.metadata.get("page") + 1
+                if doc.metadata.get("page") is not None
+                else None
         }
+        for doc in documents
+    ]
 
-
-_rag_service: Optional[RAGService] = None
-
-
-def get_rag_service() -> RAGService:
-    global _rag_service
-    if _rag_service is None:
-        _rag_service = RAGService()
-    return _rag_service
+    return {
+        "response" : response.content,
+        "sources" : sources
+    }

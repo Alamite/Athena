@@ -123,3 +123,8 @@ service-account.json
 # OS Files
 # =========================
 Thumbs.db
+
+# =========================
+# Uploads
+# =========================
+/backend/uploads/

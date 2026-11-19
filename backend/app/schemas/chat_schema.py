@@ -10,6 +10,7 @@ class ChatRequest(BaseModel):
         "hybrid_search"
     ] = "similarity"
     k: int = 3
+    use_reranker: bool = False
 
 class Source(BaseModel):
     source: str | None = None

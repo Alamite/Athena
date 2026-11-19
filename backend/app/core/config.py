@@ -9,7 +9,13 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 class Settings:
 
-    MODEL = os.getenv("MODEL", "llama3.1:8b")
+
+    USE_OLLAMA = os.getenv("USE_OLLAMA", "True")
+    OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    
+    GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4o-mini")
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "OPENAI_API_KEY")
+
     TEMP = float(os.getenv("TEMP", "0.2"))
 
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "qwen3-embedding:4b")

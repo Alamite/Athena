@@ -2,6 +2,7 @@ from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 
 from app.database.vector_store import get_vector_store
+from app.services.reranking_service import rerank_documents
 
 
 def get_bm25_retriever(vector_store, k: int):
@@ -61,7 +62,7 @@ def reciprocal_rank_fusion(results: list[list[Document]],k: int = 60):
     ]
 
 
-def retrieve_documents(query: str, k: int = 3, retrieval_type: str = "similarity"):
+def retrieve_documents(query: str, k: int = 3, retrieval_type: str = "similarity", use_reranker: bool = False, candidate_k: int = 10):
 
     
     vector_store = get_vector_store()
@@ -90,10 +91,10 @@ def retrieve_documents(query: str, k: int = 3, retrieval_type: str = "similarity
 
         vector_results = vector_store.similarity_search(
             query,
-            k = k
+            k = candidate_k
         )
 
-        bm25_retriever = get_bm25_retriever(vector_store, k)
+        bm25_retriever = get_bm25_retriever(vector_store, candidate_k)
         
         if bm25_retriever is None:
             return []
@@ -102,7 +103,15 @@ def retrieve_documents(query: str, k: int = 3, retrieval_type: str = "similarity
 
         combined_results = reciprocal_rank_fusion([vector_results, bm25_results])
 
-        return combined_results[:k]
+        if use_reranker:
+            reranked_results = rerank_documents(
+                query = query,
+                documents = combined_results,
+                top_k = k
+            )
+            return reranked_results[:k]
+        else:
+            return combined_results[:k]
 
     else:
         raise ValueError(

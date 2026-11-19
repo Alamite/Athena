@@ -12,7 +12,7 @@ router = APIRouter(
 @router.post("/", response_model = ChatResponse)
 async def chat(request: ChatRequest):
 
-    result = await generate_rag_response(request.message, request.retrieval_type, request.k)
+    result = await generate_rag_response(request.message, request.retrieval_type, request.k, request.use_reranker)
 
     return ChatResponse(
         response=result["response"],

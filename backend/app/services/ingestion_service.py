@@ -6,7 +6,7 @@ from langchain_community.document_loaders import PyPDFLoader
 
 from app.database.vector_store import get_vector_store
 
-def ingest_document(file_path: str, original_filename: str):
+def ingest_document(file_path: str, original_filename: str, chunk_size: int = 1000, chunk_overlap: int = 150):
 
     with open(file_path, "rb") as file:
         file_hash = hashlib.sha256(file.read()).hexdigest()
@@ -17,8 +17,8 @@ def ingest_document(file_path: str, original_filename: str):
     documents = loader.load()
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 1000,
-        chunk_overlap = 150
+        chunk_size = chunk_size,
+        chunk_overlap = chunk_overlap
     )
 
     chunks = splitter.split_documents(documents)

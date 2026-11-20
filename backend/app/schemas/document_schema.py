@@ -7,4 +7,5 @@ class DocumentUploadResponse(BaseModel):
     filename: str
     total_pages: int
     total_chunks: int
-    
+    chunk_size: int
+    chunk_overlap: int

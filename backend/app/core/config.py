@@ -12,7 +12,7 @@ class Settings:
 
     USE_OLLAMA = os.getenv("USE_OLLAMA", "True")
     OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-    
+
     GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4o-mini")
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "OPENAI_API_KEY")
 
@@ -27,6 +27,10 @@ class Settings:
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", str(BASE_DIR / "uploads"))
 
     MAX_FILE_SIZE = os.getenv("MAX_FILE_SIZE", str(10 * 1024 *1024))
+
+    CHUNK_SIZE = os.getenv("CHUNK_SIZE", 1000)
+
+    CHUNK_OVERLAP = os.getenv("CHUNK_OVERLAP", 150)
 
 settings = Settings()
 

@@ -3,7 +3,7 @@ import uuid
 
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
@@ -18,7 +18,9 @@ router = APIRouter(
 )
 
 @router.post("/upload",response_model = DocumentUploadResponse)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...),     
+                          chunk_size: int = Form(default=settings.CHUNK_SIZE, ge=100, le=5000),
+                          chunk_overlap: int = Form(default=settings.CHUNK_OVERLAP, ge=0)):
 
     if not file.filename:
         raise HTTPException(
@@ -61,7 +63,9 @@ async def upload_document(file: UploadFile = File(...)):
         result = await run_in_threadpool(
             ingest_document,
             str(file_path),
-            Path(file.filename).name
+            Path(file.filename).name,
+            chunk_size,
+            chunk_overlap
         )
 
         return DocumentUploadResponse(

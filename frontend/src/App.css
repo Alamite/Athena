@@ -252,3 +252,20 @@
 .checkbox input:checked + .checkmark { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
 .checkbox strong { display: block; font-size: 13.5px; font-weight: 600; }
 .checkbox small { display: block; font-size: 12px; color: var(--muted); line-height: 1.4; }
+
+/* ---------- Pre-indexed docs & user message actions ---------- */
+.doc-info { flex: 1; min-width: 0; }
+.tag {
+  font-size: 10.5px; font-weight: 600; color: var(--accent); background: var(--accent-soft);
+  padding: 1px 6px; border-radius: 99px;
+}
+.doc-action {
+  width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border-radius: 8px;
+  color: var(--muted); background: var(--panel); box-shadow: var(--shadow); text-decoration: none;
+}
+.doc-action:hover { color: var(--accent); }
+
+.msg.user { flex-direction: column; align-items: flex-end; }
+.user-actions { margin-top: 4px; opacity: 0; transition: opacity .15s; }
+.msg.user:hover .user-actions, .user-actions:focus-within { opacity: 1; }
+@media (hover: none) { .user-actions { opacity: 1; } }

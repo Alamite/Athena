@@ -148,6 +148,8 @@ export default function App() {
                   key={m.id}
                   message={m.error ? { ...m, meta: undefined } : m}
                   onRetry={m.error && m.meta ? () => ask(m.meta!, m.id) : undefined}
+                  onRepeat={m.role === 'user' ? () => ask(m.content) : undefined}
+                  busy={loading}
                 />
               ))
             )}

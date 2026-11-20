@@ -20,14 +20,45 @@ function dedupeSources(sources: Source[]) {
   })
 }
 
-export function Message({ message, onRetry }: { message: ChatMessage; onRetry?: () => void }) {
+function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
+  return (
+    <button
+      title="Copy"
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }}
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  )
+}
+
+interface MessageProps {
+  message: ChatMessage
+  onRetry?: () => void
+  /** User messages: resend the same question. */
+  onRepeat?: () => void
+  busy?: boolean
+}
+
+export function Message({ message, onRetry, onRepeat, busy }: MessageProps) {
   const sources = message.sources ? dedupeSources(message.sources) : []
 
   if (message.role === 'user') {
     return (
       <div className="msg user">
         <div className="bubble">{message.content}</div>
+        <div className="actions user-actions">
+          {onRepeat && (
+            <button onClick={onRepeat} disabled={busy} title="Ask this question again">
+              Ask again
+            </button>
+          )}
+          <CopyButton text={message.content} />
+        </div>
       </div>
     )
   }
@@ -54,15 +85,7 @@ export function Message({ message, onRetry }: { message: ChatMessage; onRetry?: 
           {message.error && onRetry ? (
             <button onClick={onRetry}>Retry</button>
           ) : (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(message.content)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
-              }}
-            >
-              {copied ? 'Copied' : 'Copy'}
-            </button>
+            <CopyButton text={message.content} />
           )}
           {message.meta && <span className="meta">{message.meta}</span>}
         </div>

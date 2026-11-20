@@ -3,7 +3,7 @@ import uuid
 
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Form
 from starlette.concurrency import run_in_threadpool
 
 from app.core.config import settings
@@ -18,12 +18,20 @@ router = APIRouter(
 )
 
 @router.post("/upload",response_model = DocumentUploadResponse)
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...),     
+                          chunk_size: int = Form(default=settings.CHUNK_SIZE, ge=100, le=5000),
+                          chunk_overlap: int = Form(default=settings.CHUNK_OVERLAP, ge=0)):
 
     if not file.filename:
         raise HTTPException(
             status_code = 400,
             detail = "Filename is required."
+        )
+
+    if chunk_overlap >= chunk_size:
+        raise HTTPException(
+            status_code = 400,
+            detail = "Chunk overlap must be smaller than chunk size."
         )
 
     if Path(file.filename).suffix.lower() != ".pdf":
@@ -61,7 +69,9 @@ async def upload_document(file: UploadFile = File(...)):
         result = await run_in_threadpool(
             ingest_document,
             str(file_path),
-            Path(file.filename).name
+            Path(file.filename).name,
+            chunk_size,
+            chunk_overlap
         )
 
         return DocumentUploadResponse(
@@ -69,7 +79,9 @@ async def upload_document(file: UploadFile = File(...)):
             document_id= result["document_id"],
             filename= result["filename"],
             total_pages= result["total_pages"],
-            total_chunks= result["total_chunks"]
+            total_chunks= result["total_chunks"],
+            chunk_size= chunk_size,
+            chunk_overlap= chunk_overlap
         )
     
     except Exception as exc:

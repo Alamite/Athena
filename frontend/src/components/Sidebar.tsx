@@ -51,6 +51,8 @@ interface Props {
   onRetrievalTypeChange: (t: RetrievalType) => void
   k: number
   onKChange: (k: number) => void
+  useReranker: boolean
+  onUseRerankerChange: (v: boolean) => void
   documents: UploadResponse[]
   onUploaded: (doc: UploadResponse) => void
   /** Mobile drawer visibility. */
@@ -65,6 +67,9 @@ export function Sidebar(props: Props) {
 
   useEffect(() => savePref('athena.sidebar', collapsed ? 'collapsed' : 'open'), [collapsed])
   useEffect(() => savePref('athena.tab', tab), [tab])
+
+  const [chunkSize, setChunkSize] = useState(DEFAULT_CHUNK_SIZE)
+  const [chunkOverlap, setChunkOverlap] = useState(DEFAULT_CHUNK_OVERLAP)
 
   return (
     <>
@@ -120,7 +125,15 @@ export function Sidebar(props: Props) {
           </div>
 
           <div className="tab-body" role="tabpanel">
-            {tab === 'ingestion' && <IngestionTab {...props} />}
+            {tab === 'ingestion' && (
+              <IngestionTab
+                {...props}
+                chunkSize={chunkSize}
+                chunkOverlap={chunkOverlap}
+                onChunkSizeChange={setChunkSize}
+                onChunkOverlapChange={setChunkOverlap}
+              />
+            )}
             {tab === 'retrieval' && <RetrievalTab {...props} />}
             {tab === 'evaluation' && <EvaluationTab />}
           </div>
@@ -130,7 +143,36 @@ export function Sidebar(props: Props) {
   )
 }
 
-function IngestionTab({ documents, onUploaded }: Props) {
+const DEFAULT_CHUNK_SIZE = 1000
+const DEFAULT_CHUNK_OVERLAP = 150
+// Mirrors the backend's Form validation (ge=100, le=5000, ge=0).
+const CHUNK_MIN = 100
+const CHUNK_MAX = 5000
+
+interface IngestionProps extends Props {
+  chunkSize: number
+  chunkOverlap: number
+  onChunkSizeChange: (v: number) => void
+  onChunkOverlapChange: (v: number) => void
+}
+
+function chunkError(size: number, overlap: number): string | null {
+  if (!Number.isInteger(size) || size < CHUNK_MIN || size > CHUNK_MAX)
+    return `Chunk size must be between ${CHUNK_MIN} and ${CHUNK_MAX}.`
+  if (!Number.isInteger(overlap) || overlap < 0) return 'Overlap must be 0 or more.'
+  if (overlap >= size) return 'Overlap must be smaller than chunk size.'
+  return null
+}
+
+function IngestionTab({
+  documents,
+  onUploaded,
+  chunkSize,
+  chunkOverlap,
+  onChunkSizeChange,
+  onChunkOverlapChange,
+}: IngestionProps) {
+  const invalid = chunkError(chunkSize, chunkOverlap)
   const inputRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -138,6 +180,10 @@ function IngestionTab({ documents, onUploaded }: Props) {
 
   async function handleFiles(files: FileList | null) {
     if (!files?.length) return
+    if (invalid) {
+      setError(invalid)
+      return
+    }
     setError(null)
     for (const file of Array.from(files)) {
       if (!file.name.toLowerCase().endsWith('.pdf')) {
@@ -146,7 +192,7 @@ function IngestionTab({ documents, onUploaded }: Props) {
       }
       setUploading(file.name)
       try {
-        onUploaded(await uploadDocument(file))
+        onUploaded(await uploadDocument(file, chunkSize, chunkOverlap))
       } catch (e) {
         setError(`${file.name}: ${(e as Error).message}`)
       }
@@ -157,10 +203,48 @@ function IngestionTab({ documents, onUploaded }: Props) {
 
   return (
     <section>
-      <h2>Upload documents</h2>
+      <h2>Chunking</h2>
+      <div className="field-row">
+        <Stepper
+          label="Chunk size"
+          value={chunkSize}
+          min={CHUNK_MIN}
+          max={CHUNK_MAX}
+          step={50}
+          disabled={!!uploading}
+          onChange={onChunkSizeChange}
+        />
+        <Stepper
+          label="Overlap"
+          value={chunkOverlap}
+          min={0}
+          max={Math.max(0, chunkSize - 1)}
+          step={10}
+          disabled={!!uploading}
+          onChange={onChunkOverlapChange}
+        />
+      </div>
+      {invalid ? (
+        <p className="error-text">{invalid}</p>
+      ) : (
+        <p className="hint">Characters per chunk. Applied to the next upload.</p>
+      )}
+      {(chunkSize !== DEFAULT_CHUNK_SIZE || chunkOverlap !== DEFAULT_CHUNK_OVERLAP) && (
+        <button
+          className="link-btn"
+          onClick={() => {
+            onChunkSizeChange(DEFAULT_CHUNK_SIZE)
+            onChunkOverlapChange(DEFAULT_CHUNK_OVERLAP)
+          }}
+        >
+          Reset to defaults
+        </button>
+      )}
+
+      <h2 className="spaced">Upload documents</h2>
       <div
-        className={`dropzone ${dragOver ? 'over' : ''} ${uploading ? 'busy' : ''}`}
-        onClick={() => !uploading && inputRef.current?.click()}
+        className={`dropzone ${dragOver ? 'over' : ''} ${uploading ? 'busy' : ''} ${invalid ? 'disabled' : ''}`}
+        onClick={() => !uploading && !invalid && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault()
           setDragOver(true)
@@ -200,7 +284,7 @@ function IngestionTab({ documents, onUploaded }: Props) {
                     {d.filename}
                   </div>
                   <div className="doc-meta">
-                    {d.total_pages} pages · {d.total_chunks} chunks
+                    {d.total_pages} pages · {d.total_chunks} chunks · {d.chunk_size}/{d.chunk_overlap}
                   </div>
                 </div>
               </li>
@@ -213,7 +297,58 @@ function IngestionTab({ documents, onUploaded }: Props) {
   )
 }
 
-function RetrievalTab({ retrievalType, onRetrievalTypeChange, k, onKChange }: Props) {
+interface StepperProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  disabled?: boolean
+  onChange: (v: number) => void
+}
+
+function Stepper({ label, value, min, max, step, disabled, onChange }: StepperProps) {
+  const valid = Number.isFinite(value)
+  const clamp = (v: number) => Math.min(max, Math.max(min, v))
+  // Snap to the step grid so 1000 → 1050, 1023 → 1050 (up) / 1000 (down).
+  const bump = (dir: 1 | -1) => {
+    const base = valid ? value : min
+    const snapped = dir > 0 ? Math.floor(base / step) * step + step : Math.ceil(base / step) * step - step
+    onChange(clamp(snapped))
+  }
+
+  return (
+    <div className="field">
+      <span>{label}</span>
+      <div className={`stepper ${disabled ? 'disabled' : ''}`}>
+        <button type="button" aria-label={`Decrease ${label}`} disabled={disabled || (valid && value <= min)} onClick={() => bump(-1)}>
+          −
+        </button>
+        <input
+          type="text"
+          inputMode="numeric"
+          aria-label={label}
+          value={valid ? value : ''}
+          disabled={disabled}
+          onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, '')
+            onChange(digits === '' ? NaN : Number(digits))
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowUp') { e.preventDefault(); bump(1) }
+            if (e.key === 'ArrowDown') { e.preventDefault(); bump(-1) }
+          }}
+        />
+        <button type="button" aria-label={`Increase ${label}`} disabled={disabled || (valid && value >= max)} onClick={() => bump(1)}>
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function RetrievalTab({ retrievalType, onRetrievalTypeChange, k, onKChange, useReranker, onUseRerankerChange }: Props) {
+  const rerankAvailable = retrievalType === 'hybrid_search'
   return (
     <section>
       <h2>Strategy</h2>
@@ -241,6 +376,31 @@ function RetrievalTab({ retrievalType, onRetrievalTypeChange, k, onKChange }: Pr
           Chunks to retrieve <strong>{k}</strong>
         </span>
         <input type="range" min={1} max={10} value={k} onChange={(e) => onKChange(Number(e.target.value))} />
+      </label>
+
+      <h2 className="spaced">Reranking</h2>
+      <label className={`checkbox ${rerankAvailable ? '' : 'disabled'}`}>
+        <input
+          type="checkbox"
+          className="sr-only"
+          checked={useReranker && rerankAvailable}
+          disabled={!rerankAvailable}
+          onChange={(e) => onUseRerankerChange(e.target.checked)}
+        />
+        <span className="checkmark" aria-hidden="true">
+          <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.4"
+            strokeLinecap="round" strokeLinejoin="round">
+            <path d="m3.5 8.5 3 3 6-7" />
+          </svg>
+        </span>
+        <span>
+          <strong>Use cross-encoder reranker</strong>
+          <small>
+            {rerankAvailable
+              ? 'Re-scores fused candidates with bge-reranker-base. Slower, usually more precise.'
+              : 'Available with Hybrid retrieval only.'}
+          </small>
+        </span>
       </label>
     </section>
   )

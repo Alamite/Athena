@@ -24,6 +24,7 @@ export default function App() {
   const [loading, setLoading] = useState(false)
   const [retrievalType, setRetrievalType] = useState<RetrievalType>('hybrid_search')
   const [k, setK] = useState(3)
+  const [useReranker, setUseReranker] = useState(false)
   const [documents, setDocuments] = useState<UploadResponse[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -57,9 +58,11 @@ export default function App() {
     const controller = new AbortController()
     abortRef.current = controller
     const mode = retrievalType
+    // The backend only applies the reranker to hybrid search.
+    const rerank = useReranker && mode === 'hybrid_search'
 
     try {
-      const res = await sendMessage(q, mode, k, controller.signal)
+      const res = await sendMessage(q, mode, k, rerank, controller.signal)
       setMessages((m) => [
         ...m,
         {
@@ -67,7 +70,7 @@ export default function App() {
           role: 'assistant',
           content: res.response,
           sources: res.sources,
-          meta: `${LABELS[mode]} · k=${k} · ${res.elapsed.toFixed(1)}s`,
+          meta: `${LABELS[mode]}${rerank ? ' + rerank' : ''} · k=${k} · ${res.elapsed.toFixed(1)}s`,
         },
       ])
     } catch (e) {
@@ -97,6 +100,8 @@ export default function App() {
         onRetrievalTypeChange={setRetrievalType}
         k={k}
         onKChange={setK}
+        useReranker={useReranker}
+        onUseRerankerChange={setUseReranker}
         documents={documents}
         onUploaded={(d) => setDocuments((docs) => [d, ...docs.filter((x) => x.document_id !== d.document_id)])}
         open={sidebarOpen}
@@ -111,7 +116,8 @@ export default function App() {
           <div className="title">
             Ask your documents
             <span className="badge">
-              {LABELS[retrievalType]} · k={k}
+              {LABELS[retrievalType]}
+              {useReranker && retrievalType === 'hybrid_search' ? ' + rerank' : ''} · k={k}
             </span>
           </div>
           {messages.length > 0 && (

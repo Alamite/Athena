@@ -18,6 +18,8 @@ export interface UploadResponse {
   filename: string
   total_pages: number
   total_chunks: number
+  chunk_size: number
+  chunk_overlap: number
 }
 
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
@@ -41,22 +43,25 @@ export async function sendMessage(
   message: string,
   retrieval_type: RetrievalType,
   k: number,
+  use_reranker: boolean,
   signal?: AbortSignal,
 ): Promise<ChatResponse> {
   const started = performance.now()
   const res = await fetch(`${BASE}/chat/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message, retrieval_type, k }),
+    body: JSON.stringify({ message, retrieval_type, k, use_reranker }),
     signal,
   })
   const data = await handle<Omit<ChatResponse, 'elapsed'>>(res)
   return { ...data, elapsed: (performance.now() - started) / 1000 }
 }
 
-export async function uploadDocument(file: File): Promise<UploadResponse> {
+export async function uploadDocument(file: File, chunkSize: number, chunkOverlap: number): Promise<UploadResponse> {
   const form = new FormData()
   form.append('file', file)
+  form.append('chunk_size', String(chunkSize))
+  form.append('chunk_overlap', String(chunkOverlap))
   const res = await fetch(`${BASE}/documents/upload`, { method: 'POST', body: form })
   return handle<UploadResponse>(res)
 }

@@ -28,9 +28,9 @@ class Settings:
 
     MAX_FILE_SIZE = os.getenv("MAX_FILE_SIZE", str(10 * 1024 *1024))
 
-    CHUNK_SIZE = os.getenv("CHUNK_SIZE", 1000)
+    CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
 
-    CHUNK_OVERLAP = os.getenv("CHUNK_OVERLAP", 150)
+    CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "150"))
 
 settings = Settings()
 

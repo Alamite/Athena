@@ -28,6 +28,12 @@ async def upload_document(file: UploadFile = File(...),
             detail = "Filename is required."
         )
 
+    if chunk_overlap >= chunk_size:
+        raise HTTPException(
+            status_code = 400,
+            detail = "Chunk overlap must be smaller than chunk size."
+        )
+
     if Path(file.filename).suffix.lower() != ".pdf":
         raise HTTPException(
             status_code = 400,
@@ -73,7 +79,9 @@ async def upload_document(file: UploadFile = File(...),
             document_id= result["document_id"],
             filename= result["filename"],
             total_pages= result["total_pages"],
-            total_chunks= result["total_chunks"]
+            total_chunks= result["total_chunks"],
+            chunk_size= chunk_size,
+            chunk_overlap= chunk_overlap
         )
     
     except Exception as exc:

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Source } from '../api'
+import type { PipelineStep, RetrievedChunk, Source } from '../api'
 
 export interface ChatMessage {
   id: string
@@ -7,7 +7,13 @@ export interface ChatMessage {
   content: string
   sources?: Source[]
   error?: boolean
-  meta?: string
+  /** Assistant: the question this answers (used for retry and the inspector). */
+  question?: string
+  /** Assistant: retrieval settings used, e.g. "Hybrid + rerank · k=3". */
+  config?: string
+  elapsed?: number
+  steps?: PipelineStep[]
+  chunks?: RetrievedChunk[]
 }
 
 function dedupeSources(sources: Source[]) {
@@ -41,10 +47,11 @@ interface MessageProps {
   onRetry?: () => void
   /** User messages: resend the same question. */
   onRepeat?: () => void
+  onInspect?: () => void
   busy?: boolean
 }
 
-export function Message({ message, onRetry, onRepeat, busy }: MessageProps) {
+export function Message({ message, onRetry, onRepeat, onInspect, busy }: MessageProps) {
   const sources = message.sources ? dedupeSources(message.sources) : []
 
   if (message.role === 'user') {
@@ -87,22 +94,17 @@ export function Message({ message, onRetry, onRepeat, busy }: MessageProps) {
           ) : (
             <CopyButton text={message.content} />
           )}
-          {message.meta && <span className="meta">{message.meta}</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function Thinking() {
-  return (
-    <div className="msg assistant">
-      <div className="avatar">A</div>
-      <div className="body">
-        <div className="typing">
-          <span />
-          <span />
-          <span />
+          {onInspect && !!message.steps?.length && (
+            <button onClick={onInspect} title="Show pipeline steps and retrieved chunks">
+              Inspect
+            </button>
+          )}
+          {!message.error && message.config && (
+            <span className="meta">
+              {message.config}
+              {message.elapsed != null && ` · ${message.elapsed.toFixed(1)}s`}
+            </span>
+          )}
         </div>
       </div>
     </div>

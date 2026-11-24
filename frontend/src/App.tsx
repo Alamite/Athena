@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
-import { sendMessage, type RetrievalType, type UploadResponse } from './api'
-import { Message, Thinking, type ChatMessage } from './components/Message'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { PipelineError, streamChat, type PipelineStep, type RetrievalType, type UploadResponse } from './api'
+import { Inspector } from './components/Inspector'
+import { Message, type ChatMessage } from './components/Message'
+import { LiveActivity } from './components/PipelineSteps'
 import { Sidebar } from './components/Sidebar'
 import './App.css'
 
@@ -27,6 +29,10 @@ export default function App() {
   const [useReranker, setUseReranker] = useState(false)
   const [documents, setDocuments] = useState<UploadResponse[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [liveSteps, setLiveSteps] = useState<PipelineStep[]>([])
+  const [inspectId, setInspectId] = useState<string | null>(null)
+  const inspected = messages.find((m) => m.id === inspectId) ?? null
+  const closeInspector = useCallback(() => setInspectId(null), [])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -34,7 +40,7 @@ export default function App() {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, loading])
+  }, [messages, loading, liveSteps.length])
 
   useEffect(() => {
     const el = textareaRef.current
@@ -55,14 +61,20 @@ export default function App() {
     }
 
     setLoading(true)
+    setLiveSteps([])
     const controller = new AbortController()
     abortRef.current = controller
     const mode = retrievalType
     // The backend only applies the reranker to hybrid search.
     const rerank = useReranker && mode === 'hybrid_search'
+    const config = `${LABELS[mode]}${rerank ? ' + rerank' : ''} · k=${k}`
 
     try {
-      const res = await sendMessage(q, mode, k, rerank, controller.signal)
+      const res = await streamChat(
+        { message: q, retrieval_type: mode, k, use_reranker: rerank },
+        setLiveSteps,
+        controller.signal,
+      )
       setMessages((m) => [
         ...m,
         {
@@ -70,7 +82,11 @@ export default function App() {
           role: 'assistant',
           content: res.response,
           sources: res.sources,
-          meta: `${LABELS[mode]}${rerank ? ' + rerank' : ''} · k=${k} · ${res.elapsed.toFixed(1)}s`,
+          question: q,
+          config,
+          elapsed: res.elapsed,
+          steps: res.steps,
+          chunks: res.chunks,
         },
       ])
     } catch (e) {
@@ -83,7 +99,9 @@ export default function App() {
           role: 'assistant',
           content: aborted ? 'Request cancelled.' : `Something went wrong: ${err.message}`,
           error: true,
-          meta: q, // stash question for retry
+          question: q,
+          config,
+          steps: err instanceof PipelineError ? err.steps : undefined,
         },
       ])
     } finally {
@@ -121,7 +139,7 @@ export default function App() {
             </span>
           </div>
           {messages.length > 0 && (
-            <button className="ghost" onClick={() => setMessages([])} disabled={loading}>
+            <button className="ghost" onClick={() => { setMessages([]); setInspectId(null) }} disabled={loading}>
               New chat
             </button>
           )}
@@ -146,14 +164,15 @@ export default function App() {
               messages.map((m) => (
                 <Message
                   key={m.id}
-                  message={m.error ? { ...m, meta: undefined } : m}
-                  onRetry={m.error && m.meta ? () => ask(m.meta!, m.id) : undefined}
+                  message={m}
+                  onRetry={m.error && m.question ? () => ask(m.question!, m.id) : undefined}
+                  onInspect={m.role === 'assistant' ? () => setInspectId(m.id) : undefined}
                   onRepeat={m.role === 'user' ? () => ask(m.content) : undefined}
                   busy={loading}
                 />
               ))
             )}
-            {loading && <Thinking />}
+            {loading && <LiveActivity steps={liveSteps} />}
           </div>
         </div>
 
@@ -191,6 +210,7 @@ export default function App() {
           <p className="disclaimer">Enter to send · Shift+Enter for a new line</p>
         </form>
       </main>
+      <Inspector message={inspected} onClose={closeInspector} />
     </div>
   )
 }

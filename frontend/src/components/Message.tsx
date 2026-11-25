@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { Source } from '../api'
+import type { PipelineStep, RetrievedChunk, Source } from '../api'
 
 export interface ChatMessage {
   id: string
@@ -7,7 +7,13 @@ export interface ChatMessage {
   content: string
   sources?: Source[]
   error?: boolean
-  meta?: string
+  /** Assistant: the question this answers (used for retry and the inspector). */
+  question?: string
+  /** Assistant: retrieval settings used, e.g. "Hybrid + rerank · k=3". */
+  config?: string
+  elapsed?: number
+  steps?: PipelineStep[]
+  chunks?: RetrievedChunk[]
 }
 
 function dedupeSources(sources: Source[]) {
@@ -20,14 +26,46 @@ function dedupeSources(sources: Source[]) {
   })
 }
 
-export function Message({ message, onRetry }: { message: ChatMessage; onRetry?: () => void }) {
+function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false)
+  return (
+    <button
+      title="Copy"
+      onClick={() => {
+        navigator.clipboard.writeText(text)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }}
+    >
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  )
+}
+
+interface MessageProps {
+  message: ChatMessage
+  onRetry?: () => void
+  /** User messages: resend the same question. */
+  onRepeat?: () => void
+  onInspect?: () => void
+  busy?: boolean
+}
+
+export function Message({ message, onRetry, onRepeat, onInspect, busy }: MessageProps) {
   const sources = message.sources ? dedupeSources(message.sources) : []
 
   if (message.role === 'user') {
     return (
       <div className="msg user">
         <div className="bubble">{message.content}</div>
+        <div className="actions user-actions">
+          {onRepeat && (
+            <button onClick={onRepeat} disabled={busy} title="Ask this question again">
+              Ask again
+            </button>
+          )}
+          <CopyButton text={message.content} />
+        </div>
       </div>
     )
   }
@@ -54,32 +92,19 @@ export function Message({ message, onRetry }: { message: ChatMessage; onRetry?: 
           {message.error && onRetry ? (
             <button onClick={onRetry}>Retry</button>
           ) : (
-            <button
-              onClick={() => {
-                navigator.clipboard.writeText(message.content)
-                setCopied(true)
-                setTimeout(() => setCopied(false), 1500)
-              }}
-            >
-              {copied ? 'Copied' : 'Copy'}
+            <CopyButton text={message.content} />
+          )}
+          {onInspect && !!message.steps?.length && (
+            <button onClick={onInspect} title="Show pipeline steps and retrieved chunks">
+              Inspect
             </button>
           )}
-          {message.meta && <span className="meta">{message.meta}</span>}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export function Thinking() {
-  return (
-    <div className="msg assistant">
-      <div className="avatar">A</div>
-      <div className="body">
-        <div className="typing">
-          <span />
-          <span />
-          <span />
+          {!message.error && message.config && (
+            <span className="meta">
+              {message.config}
+              {message.elapsed != null && ` · ${message.elapsed.toFixed(1)}s`}
+            </span>
+          )}
         </div>
       </div>
     </div>

@@ -46,11 +46,24 @@ def ingest_document(file_path: str, original_filename: str, chunk_size: int = 10
         }
     )
 
+    BATCH_SIZE = 32
+
+    for start in range(0, len(chunks), BATCH_SIZE):
+
+        end = start + BATCH_SIZE
+
+        batch_chunks = chunks[start:end]
+        batch_ids = chunk_ids[start:end]
+
+        vector_store.add_documents(
+            documents=batch_chunks,
+            ids=batch_ids
+        )
     # Add the chunks to vector DB
-    vector_store.add_documents(
-        documents = chunks,
-        ids = chunk_ids
-    )
+    # vector_store.add_documents(
+    #     documents = chunks,
+    #     ids = chunk_ids
+    # )
 
     return {
         "document_id": document_id,

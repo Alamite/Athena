@@ -143,6 +143,18 @@ export function Sidebar(props: Props) {
   )
 }
 
+/** Documents shipped with the app and indexed in Chroma ahead of time. PDFs live in frontend/public. */
+const PREINDEXED_DOCS = [
+  { filename: 'iphone user guide.pdf', title: 'iPhone User Guide', pages: 217, href: '/data/iphone%20user%20guide.pdf' },
+]
+
+const DOWNLOAD_ICON = (
+  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.9"
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" />
+  </svg>
+)
+
 const DEFAULT_CHUNK_SIZE = 1000
 const DEFAULT_CHUNK_OVERLAP = 150
 // Mirrors the backend's Form validation (ge=100, le=5000, ge=0).
@@ -272,6 +284,26 @@ function IngestionTab({
       </div>
       {error && <p className="error-text">{error}</p>}
 
+      <h2 className="spaced">Pre-indexed</h2>
+      <ul className="doc-list">
+        {PREINDEXED_DOCS.map((d) => (
+          <li key={d.filename}>
+            <span className="doc-icon">PDF</span>
+            <div className="doc-info">
+              <div className="doc-name" title={d.filename}>
+                {d.title}
+              </div>
+              <div className="doc-meta">
+                {d.pages} pages · <span className="tag">Default</span>
+              </div>
+            </div>
+            <a className="doc-action" href={d.href} download={d.filename} title={`Download ${d.filename}`} aria-label={`Download ${d.title}`}>
+              {DOWNLOAD_ICON}
+            </a>
+          </li>
+        ))}
+      </ul>
+
       {documents.length > 0 && (
         <>
           <h2 className="spaced">Indexed this session</h2>
@@ -292,7 +324,7 @@ function IngestionTab({
           </ul>
         </>
       )}
-      <p className="hint">Previously indexed documents remain searchable.</p>
+      <p className="hint">All indexed documents are searched together.</p>
     </section>
   )
 }

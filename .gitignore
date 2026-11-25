@@ -72,10 +72,10 @@ out/
 # =========================
 # ChromaDB
 # =========================
-chroma/
-chroma_db/
-persist/
-vectorstore/
+# chroma/
+# chroma_db/
+# persist/
+# vectorstore/
 
 # =========================
 # Embeddings / Models

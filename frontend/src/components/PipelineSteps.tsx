@@ -14,8 +14,7 @@ function StatusIcon({ status }: { status: PipelineStep['status'] }) {
 }
 
 /** Vertical list of pipeline stages. `showBars` adds a bar for each stage's share of total time. */
-export function StepList({ steps, showBars = false }: { steps: PipelineStep[]; showBars?: boolean }) {
-  const total = steps.reduce((t, s) => t + (s.duration_ms ?? 0), 0)
+export function StepList({ steps}: { steps: PipelineStep[]; showBars?: boolean }) {
   return (
     <ol className="steps">
       {steps.map((s) => (

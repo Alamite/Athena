@@ -4,6 +4,7 @@ import { Inspector } from './components/Inspector'
 import { Message, type ChatMessage } from './components/Message'
 import { LiveActivity } from './components/PipelineSteps'
 import { Sidebar } from './components/Sidebar'
+import heroLogo from './assets/athena-home-hero.png'
 import './App.css'
 
 const LABELS: Record<RetrievalType, string> = {
@@ -149,7 +150,7 @@ export default function App() {
           <div className="messages-inner">
             {messages.length === 0 ? (
               <div className="empty">
-                <div className="empty-mark">A</div>
+                <img src={heroLogo} className="empty-hero" alt="Athena" width={160} height={160} />
                 <h1>What would you like to know?</h1>
                 <p>Upload PDFs in the sidebar, then ask questions. Answers are grounded only in your documents.</p>
                 <div className="suggestions">

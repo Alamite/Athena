@@ -1,5 +1,6 @@
 import type { PipelineStep } from '../api'
 import { formatMs } from '../format'
+import { Avatar } from './Avatar'
 
 function StatusIcon({ status }: { status: PipelineStep['status'] }) {
   if (status === 'running') return <span className="step-icon running"><span className="spinner sm" /></span>
@@ -45,7 +46,7 @@ export function LiveActivity({ steps }: { steps: PipelineStep[] }) {
     : [{ id: 'connect', label: 'Sending question to backend', status: 'running' }]
   return (
     <div className="msg assistant">
-      <div className="avatar">A</div>
+      <Avatar />
       <div className="body">
         <div className="activity">
           <StepList steps={shown} />

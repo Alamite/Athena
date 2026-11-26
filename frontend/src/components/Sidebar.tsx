@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { uploadDocument, type RetrievalType, type UploadResponse } from '../api'
+import logo from '../assets/athena-logo-mark.png'
+
 
 const RETRIEVAL_OPTIONS: { value: RetrievalType; label: string; hint: string }[] = [
   { value: 'similarity', label: 'Vector', hint: 'Semantic similarity via embeddings' },
@@ -77,6 +79,7 @@ export function Sidebar(props: Props) {
       <aside className={`sidebar ${open ? 'open' : ''} ${collapsed ? 'collapsed' : ''}`}>
         {/* Collapsed rail (desktop only) */}
         <div className="rail">
+          <img src={logo} className="brand-logo rail-logo" alt="Athena" />
           <button className="rail-btn" onClick={() => setCollapsed(false)} title="Expand panel" aria-label="Expand panel">
             {ICONS.expand}
           </button>
@@ -101,7 +104,7 @@ export function Sidebar(props: Props) {
         <div className="panel">
           <div className="panel-head">
             <div className="brand">
-              <span className="brand-mark">A</span>
+              <img src={logo} className="brand-logo" alt="" />
               <span>Athena</span>
             </div>
             <button className="rail-btn collapse-btn" onClick={() => setCollapsed(true)} title="Collapse panel" aria-label="Collapse panel">

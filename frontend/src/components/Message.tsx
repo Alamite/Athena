@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { PipelineStep, RetrievedChunk, Source } from '../api'
+import { Avatar } from './Avatar'
 
 export interface ChatMessage {
   id: string
@@ -72,7 +73,7 @@ export function Message({ message, onRetry, onRepeat, onInspect, busy }: Message
 
   return (
     <div className={`msg assistant ${message.error ? 'error' : ''}`}>
-      <div className="avatar">A</div>
+      <Avatar />
       <div className="body">
         <div className="content">{message.content}</div>
 
